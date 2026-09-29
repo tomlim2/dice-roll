@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#173a31" />
+    <title>주사위 굴리기</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  </head>
+  <body>
+    <canvas id="scene" aria-label="주사위 테이블 — 클릭하거나 스와이프해서 주사위를 던지세요"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <div id="labels" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="currentColor" />
+          <g fill="#173a31">
+            <circle cx="8" cy="8" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="16" cy="16" r="1.8" />
+          </g>
+        </svg>
+        <span>DICE</span>
+      </div>
+      <button id="sound" class="icon-button" type="button" aria-label="소리" aria-pressed="true">
+        <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+        </svg>
+        <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+          <path d="m16 9 6 6m0-6-6 6" />
+        </svg>
+      </button>
+    </header>
+
+    <section id="result" class="result is-empty" aria-live="polite">
+      <div id="result-caption" class="result-caption">결과</div>
+      <div id="result-total" class="result-total">–</div>
+      <div id="result-faces" class="result-faces"></div>
+    </section>
+
+    <p id="hint" class="hint">
+      <span class="hint-touch">탭하거나 스와이프해서 던지세요</span>
+      <span class="hint-mouse">클릭·드래그하거나 <kbd>Space</kbd> 로 던지세요</span>
+    </p>
+
+    <footer id="dock" class="dock">
+      <div class="stepper" role="group" aria-label="주사위 개수">
+        <button id="dice-minus" type="button" aria-label="주사위 빼기">−</button>
+        <span class="count"><output id="dice-count">2</output>개</span>
+        <button id="dice-plus" type="button" aria-label="주사위 더하기">+</button>
+      </div>
+      <button id="roll" class="roll-button" type="button">굴리기</button>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
