@@ -8,7 +8,11 @@ import './style.css';
 
 const MIN_DICE = 1;
 const MAX_DICE = 6;
-const TABLE_COLOR = 0x1f4a3e;
+const TABLE_COLOR = 0xededed;
+const BACKDROP_COLOR = 0x0b0b0b; // 바닥 바깥 배경. style.css 의 --bg 와 같게
+const RIM_COLOR = 0xf4f4f4;
+const RIM_WIDTH = 0.22;
+const RIM_HEIGHT = 0.45;
 const CAMERA_PITCH = THREE.MathUtils.degToRad(64); // 테이블을 내려다보는 각도
 const MIN_FIELD = 7; // HUD 에 안 가려진 화면의 짧은 변에 최소 이만큼(주사위 칸 수)은 보이게
 const WALL_INSET = 0.15;
@@ -45,7 +49,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(TABLE_COLOR);
+scene.background = new THREE.Color(BACKDROP_COLOR);
 const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
 
 // 주사위 표면 반사용 환경맵. 테이블은 직접광만 받게 scene.environment 에는 안 넣음
@@ -56,8 +60,8 @@ room.dispose();
 pmrem.dispose();
 const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-scene.add(new THREE.HemisphereLight(0xfff5e6, 0x10251f, 1.2));
-const sun = new THREE.DirectionalLight(0xfff0dc, 2.4);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x202020, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.radius = 4;
@@ -65,30 +69,59 @@ sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.02;
 scene.add(sun, sun.target);
 
+// 네모난 바닥. layout() 에서 물리 벽 범위(field)에 딱 맞춰 크기를 바꿈
+const floorTexture = grainTexture();
 const table = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: TABLE_COLOR, map: feltTexture(), roughness: 0.95 }),
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color: TABLE_COLOR, map: floorTexture, roughness: 0.95 }),
 );
 table.rotation.x = -Math.PI / 2;
 table.receiveShadow = true;
 scene.add(table);
 
-// 펠트 질감용 잔잔한 노이즈
-function feltTexture() {
+// 바닥 둘레 테두리 (left, right, far, near)
+const rimMaterial = new THREE.MeshStandardMaterial({ color: RIM_COLOR, roughness: 0.85 });
+const rims = Array.from({ length: 4 }, () => {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), rimMaterial);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+});
+
+function fitFloor() {
+  const w = field.maxX - field.minX;
+  const d = field.maxZ - field.minZ;
+  const cx = (field.minX + field.maxX) / 2;
+  const cz = (field.minZ + field.maxZ) / 2;
+  table.scale.set(w, d, 1);
+  table.position.set(cx, 0, cz);
+  floorTexture.repeat.set(w * 0.3, d * 0.3);
+  const [left, right, far, near] = rims;
+  left.scale.set(RIM_WIDTH, RIM_HEIGHT, d + RIM_WIDTH * 2);
+  left.position.set(field.minX - RIM_WIDTH / 2, RIM_HEIGHT / 2, cz);
+  right.scale.copy(left.scale);
+  right.position.set(field.maxX + RIM_WIDTH / 2, RIM_HEIGHT / 2, cz);
+  far.scale.set(w, RIM_HEIGHT, RIM_WIDTH);
+  far.position.set(cx, RIM_HEIGHT / 2, field.minZ - RIM_WIDTH / 2);
+  near.scale.copy(far.scale);
+  near.position.set(cx, RIM_HEIGHT / 2, field.maxZ + RIM_WIDTH / 2);
+}
+
+// 바닥 질감용 잔잔한 노이즈
+function grainTexture() {
   const size = 256;
   const tile = document.createElement('canvas');
   tile.width = tile.height = size;
   const ctx = tile.getContext('2d');
   const image = ctx.createImageData(size, size);
   for (let i = 0; i < image.data.length; i += 4) {
-    const v = 215 + Math.random() * 40;
+    const v = 244 + Math.random() * 11;
     image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
     image.data[i + 3] = 255;
   }
   ctx.putImageData(image, 0, 0);
   const texture = new THREE.CanvasTexture(tile);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(60, 60);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = anisotropy;
   return texture;
@@ -371,6 +404,7 @@ function layout() {
   field = measureField() ?? field;
 
   physics.setBounds(field);
+  fitFloor();
   fitShadow();
   keepDiceInField();
   placeLabels();
@@ -478,6 +512,7 @@ window.addEventListener('resize', layout);
 // ── 시작 ───────────────────────────────────────────────
 
 applySound();
+fitFloor();
 physics.setBounds(field); // 크기 0인 창에서 시작해 layout 이 건너뛰어져도 벽은 제자리에
 layout();
 setDiceCount(Number(store.get('dice.count', 2)) || 2);

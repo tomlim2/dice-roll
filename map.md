@@ -34,8 +34,8 @@ main.js ─┬─ dice.js      (DIE_SIZE, createDieMesh, readTopFace, restingQua
 | 주사위 관리 | `addDie`, `removeDie`, `setDiceCount`, `arrangeDice`, `placeBody` |
 | 굴리기 | `roll`, `updateRoll`, `finishRoll`, `onCollide` |
 | 결과 라벨 | `showLabels`, `placeLabels` |
-| 카메라/레이아웃 | `pointAt`, `placeCamera`, `measureField`, `layout`, `fitShadow`, `keepDiceInField` |
-| 기타 | `feltTexture` (테이블 질감), `applySound` |
+| 카메라/레이아웃 | `pointAt`, `placeCamera`, `measureField`, `layout`, `fitFloor` (바닥·테두리를 벽 범위에 맞춤), `fitShadow`, `keepDiceInField` |
+| 기타 | `grainTexture` (바닥 질감), `applySound` |
 
 주요 상수(`main.js` 상단): `MIN_DICE`/`MAX_DICE`(1~6), `SETTLE_TIMEOUT`(10초), `MAX_NUDGES`, `CAMERA_PITCH`.
 

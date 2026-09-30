@@ -70,9 +70,8 @@ export function clearResult() {
 /** 결과 칩: 3D 주사위와 같은 눈 배치의 작은 SVG */
 function faceIcon(value, index) {
   const r = pipRadius(value) * 100;
-  const fill = value === 1 ? COLORS.pipOne : COLORS.pip;
   const pips = PIPS[value]
-    .map(([x, y]) => `<circle cx="${x * 100}" cy="${y * 100}" r="${r}" fill="${fill}"/>`)
+    .map(([x, y]) => `<circle cx="${x * 100}" cy="${y * 100}" r="${r}" fill="${COLORS.pip}"/>`)
     .join('');
   return (
     `<svg class="face" style="--i:${index}" viewBox="0 0 100 100" role="img" aria-label="${value}">` +
