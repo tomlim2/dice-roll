@@ -8,7 +8,11 @@ import './style.css';
 
 const MIN_DICE = 1;
 const MAX_DICE = 6;
-const TABLE_COLOR = 0x1f4a3e;
+const TABLE_COLOR = 0xededed;
+const BACKDROP_COLOR = 0x0b0b0b; // 바닥 바깥 배경. style.css 의 --bg 와 같게
+const RIM_COLOR = 0xf4f4f4;
+const RIM_WIDTH = 0.22;
+const RIM_HEIGHT = 0.45;
 const CAMERA_PITCH = THREE.MathUtils.degToRad(64); // 테이블을 내려다보는 각도
 const MIN_FIELD = 7; // HUD 에 안 가려진 화면의 짧은 변에 최소 이만큼(주사위 칸 수)은 보이게
 const WALL_INSET = 0.15;
@@ -45,19 +49,24 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(TABLE_COLOR);
+scene.background = new THREE.Color(BACKDROP_COLOR);
 const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
 
 // 주사위 표면 반사용 환경맵. 테이블은 직접광만 받게 scene.environment 에는 안 넣음
 const pmrem = new THREE.PMREMGenerator(renderer);
 const room = new RoomEnvironment();
+// 방 바닥은 검은 판으로 가림. 안 가리면 아래를 비추는 옆면·아래 모서리가 밝은 바닥을 비춰서 허옇게 뜸
+const shade = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+shade.rotation.x = -Math.PI / 2;
+shade.position.y = -0.2;
+room.add(shade);
 const envMap = pmrem.fromScene(room, 0.04).texture;
 room.dispose();
 pmrem.dispose();
 const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-scene.add(new THREE.HemisphereLight(0xfff5e6, 0x10251f, 1.2));
-const sun = new THREE.DirectionalLight(0xfff0dc, 2.4);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x202020, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.radius = 4;
@@ -65,30 +74,73 @@ sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.02;
 scene.add(sun, sun.target);
 
+// 둥근 바닥. layout() 에서 물리 벽 범위(field)에 딱 맞춰 크기를 바꿈
+const floorTexture = grainTexture();
+// 바닥·테두리는 스펙큘러 0: 반사광 없이 확산광만
 const table = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: TABLE_COLOR, map: feltTexture(), roughness: 0.95 }),
+  new THREE.CircleGeometry(1, 128),
+  new THREE.MeshPhysicalMaterial({ color: TABLE_COLOR, map: floorTexture, roughness: 1, specularIntensity: 0 }),
 );
 table.rotation.x = -Math.PI / 2;
 table.receiveShadow = true;
 scene.add(table);
 
-// 펠트 질감용 잔잔한 노이즈
-function feltTexture() {
+// 바닥 둘레 테두리. 반지름이 바뀌면 모양을 새로 만듦
+const rim = new THREE.Mesh(
+  new THREE.BufferGeometry(),
+  new THREE.MeshPhysicalMaterial({
+    color: RIM_COLOR,
+    roughness: 1,
+    specularIntensity: 0,
+    // 그림자는 빛을 받는 면(윗면·바깥 벽)으로 계산. 기본값(뒷면)이면 안쪽 벽 밑동으로 빛이 새서 흰 줄이 생김
+    shadowSide: THREE.FrontSide,
+  }),
+);
+rim.castShadow = rim.receiveShadow = true;
+scene.add(rim);
+
+function fitFloor() {
+  const { cx, cz, radius } = field;
+  // 바닥은 테두리 밑까지 깔아서 경계에 틈이 안 보이게
+  const floorRadius = radius + RIM_WIDTH / 2;
+  table.scale.set(floorRadius, floorRadius, 1);
+  table.position.set(cx, 0, cz);
+  floorTexture.repeat.setScalar(floorRadius * 0.6);
+  rim.geometry.dispose();
+  rim.geometry = rimGeometry(radius);
+  rim.position.set(cx, 0, cz);
+}
+
+/** 단면(바깥 벽 → 윗면 → 안쪽 벽)을 한 바퀴 돌린 고리. 모서리 점을 두 번씩 넣어 각을 살림 */
+function rimGeometry(radius) {
+  const inner = radius;
+  const outer = radius + RIM_WIDTH;
+  const profile = [
+    [outer, 0],
+    [outer, RIM_HEIGHT],
+    [outer, RIM_HEIGHT],
+    [inner, RIM_HEIGHT],
+    [inner, RIM_HEIGHT],
+    [inner, 0],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  return new THREE.LatheGeometry(profile, 128);
+}
+
+// 바닥 질감용 잔잔한 노이즈
+function grainTexture() {
   const size = 256;
   const tile = document.createElement('canvas');
   tile.width = tile.height = size;
   const ctx = tile.getContext('2d');
   const image = ctx.createImageData(size, size);
   for (let i = 0; i < image.data.length; i += 4) {
-    const v = 215 + Math.random() * 40;
+    const v = 244 + Math.random() * 11;
     image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
     image.data[i + 3] = 255;
   }
   ctx.putImageData(image, 0, 0);
   const texture = new THREE.CanvasTexture(tile);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(60, 60);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = anisotropy;
   return texture;
@@ -97,8 +149,7 @@ function feltTexture() {
 // ── 주사위 ─────────────────────────────────────────────
 
 const physics = createPhysics();
-const dice = []; // { mesh, body, label, value }
-const labelLayer = document.querySelector('#labels');
+const dice = []; // { mesh, body }
 
 let state = 'idle'; // idle → rolling → settled
 let rollStartedAt = 0;
@@ -110,18 +161,13 @@ function addDie() {
   scene.add(mesh);
   const body = physics.addDie();
   body.addEventListener('collide', onCollide);
-  const label = document.createElement('div');
-  label.className = 'die-label';
-  label.append(document.createElement('span'));
-  labelLayer.append(label);
-  dice.push({ mesh, body, label, value: null });
+  dice.push({ mesh, body });
 }
 
 function removeDie() {
   const die = dice.pop();
   scene.remove(die.mesh);
   physics.world.removeBody(die.body);
-  die.label.remove();
 }
 
 const lastHit = new WeakMap();
@@ -151,8 +197,7 @@ function placeBody(body, x, y, z, q) {
 
 /** 굴리기 전 대기 상태: 테이블 가운데에 가지런히 */
 function arrangeDice(keepRotation = false) {
-  const cx = (field.minX + field.maxX) / 2;
-  const cz = (field.minZ + field.maxZ) / 2;
+  const { cx, cz } = field;
   const cols = dice.length <= 3 ? dice.length : Math.ceil(dice.length / 2);
   const rows = Math.ceil(dice.length / cols);
   const gap = DIE_SIZE * 1.8;
@@ -173,10 +218,7 @@ function arrangeDice(keepRotation = false) {
  */
 function roll({ origin, direction, power = 1 } = {}) {
   unlockAudio();
-  const cx = (field.minX + field.maxX) / 2;
-  const cz = (field.minZ + field.maxZ) / 2;
-  const halfW = (field.maxX - field.minX) / 2;
-  const halfD = (field.maxZ - field.minZ) / 2;
+  const { cx, cz, radius } = field;
   const perRow = 3;
   const rows = Math.ceil(dice.length / perRow);
   const spacing = DIE_SIZE * 1.8;
@@ -185,29 +227,25 @@ function roll({ origin, direction, power = 1 } = {}) {
   let start = origin;
   if (!start) {
     // 던지는 방향 반대쪽 가장자리에서 출발
-    const margin = 1.2 + (rows - 1) * spacing;
-    const reach = Math.max(
-      0,
-      Math.min(
-        dir.x ? (halfW - margin) / Math.abs(dir.x) : Infinity,
-        dir.y ? (halfD - margin) / Math.abs(dir.y) : Infinity,
-      ),
-    );
+    const reach = Math.max(0, radius - 1.2 - (rows - 1) * spacing);
     start = new THREE.Vector2(cx - dir.x * reach, cz - dir.y * reach);
   }
   const side = new THREE.Vector2(-dir.y, dir.x);
   const speed = rand(7.5, 10) * power;
-  const m = DIE_SIZE * 0.9;
 
-  dice.forEach(({ body }, i) => {
-    // 한 줄에 셋씩, 던지는 방향과 수직으로 늘어놓고 줄마다 뒤로·위로 물려서 겹치지 않게
+  // 한 줄에 셋씩, 던지는 방향과 수직으로 늘어놓고 줄마다 뒤로·위로 물려서 겹치지 않게
+  const spots = dice.map((_, i) => {
     const row = Math.floor(i / perRow);
     const inRow = Math.min(perRow, dice.length - row * perRow);
     const across = (i - row * perRow - (inRow - 1) / 2) * spacing + rand(-0.2, 0.2);
     const back = row * spacing + rand(-0.2, 0.2);
-    const x = clamp(start.x + side.x * across - dir.x * back, field.minX + m, field.maxX - m);
-    const z = clamp(start.y + side.y * across - dir.y * back, field.minZ + m, field.maxZ - m);
-    placeBody(body, x, 2 + row * spacing + rand(0, 0.5), z, new THREE.Quaternion().random());
+    return start.clone().addScaledVector(side, across).addScaledVector(dir, -back);
+  });
+  fitInsideField(spots, DIE_SIZE * 0.9);
+
+  dice.forEach(({ body }, i) => {
+    const row = Math.floor(i / perRow);
+    placeBody(body, spots[i].x, 2 + row * spacing + rand(0, 0.5), spots[i].y, new THREE.Quaternion().random());
 
     const v = speed * rand(0.85, 1.15);
     body.velocity.set(dir.x * v + rand(-1, 1), rand(2, 4), dir.y * v + rand(-1, 1));
@@ -218,7 +256,6 @@ function roll({ origin, direction, power = 1 } = {}) {
   state = 'rolling';
   rollStartedAt = quietSince = performance.now();
   nudges = 0;
-  showLabels(false);
   ui.showRolling();
 }
 
@@ -254,38 +291,15 @@ const projected = new THREE.Vector3();
 
 function finishRoll() {
   state = 'settled';
-  for (const die of dice) die.value = readTopFace(die.body.quaternion).value;
   // 결과 칩은 화면 왼쪽 → 오른쪽 순서로
   const values = dice
-    .map((die) => ({ value: die.value, x: projected.copy(die.mesh.position).project(camera).x }))
+    .map(({ mesh, body }) => ({
+      value: readTopFace(body.quaternion).value,
+      x: projected.copy(mesh.position).project(camera).x,
+    }))
     .sort((a, b) => a.x - b.x)
     .map(({ value }) => value);
   ui.showResult(values);
-  showLabels(true);
-}
-
-function showLabels(visible) {
-  dice.forEach((die, i) => {
-    if (visible) {
-      die.label.firstChild.textContent = die.value;
-      die.label.style.setProperty('--i', i);
-    }
-    die.label.classList.toggle('show', visible);
-  });
-  placeLabels();
-}
-
-/** 멈춘 주사위 머리 위 숫자 말풍선 */
-function placeLabels() {
-  if (state !== 'settled') return;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  for (const { mesh, label } of dice) {
-    projected.copy(mesh.position);
-    projected.y += DIE_SIZE * 1.1;
-    projected.project(camera);
-    label.style.transform = `translate(${((projected.x + 1) / 2) * w}px, ${((1 - projected.y) / 2) * h}px)`;
-  }
 }
 
 function setDiceCount(count) {
@@ -302,7 +316,7 @@ function setDiceCount(count) {
 
 // ── 카메라 / 화면 맞춤 ─────────────────────────────────
 
-let field = { minX: -4, maxX: 4, minZ: -3, maxZ: 3 };
+let field = { cx: 0, cz: 0, radius: 3 }; // 바닥 원. 물리 벽·바닥·테두리가 모두 이걸 따름
 const raycaster = new THREE.Raycaster();
 const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const ndc = new THREE.Vector2();
@@ -350,6 +364,48 @@ function measureField() {
   };
 }
 
+/** 보이는 범위 안에 테두리까지 들어가는 가장 큰 원 */
+function circleIn({ minX, maxX, minZ, maxZ }) {
+  return {
+    cx: (minX + maxX) / 2,
+    cz: (minZ + maxZ) / 2,
+    radius: Math.min(maxX - minX, maxZ - minZ) / 2 - RIM_WIDTH,
+  };
+}
+
+/** (x, z) 가 바닥 원 가장자리에서 margin 안쪽에 들도록 중심 쪽으로 당김 */
+function insideField(x, z, margin) {
+  const { cx, cz, radius } = field;
+  const limit = Math.max(radius - margin, 0);
+  const distance = Math.hypot(x - cx, z - cz);
+  if (distance <= limit) return [x, z];
+  const k = limit / distance;
+  return [cx + (x - cx) * k, cz + (z - cz) * k];
+}
+
+/**
+ * 점들을 모양 그대로 원 중심 쪽으로 옮겨서 전부 바닥 원 가장자리에서 margin 안쪽에 들게.
+ * 하나씩 따로 당기면 서로 겹쳐서 튕겨 나가니 통째로 옮김
+ */
+function fitInsideField(points, margin) {
+  const center = new THREE.Vector2(field.cx, field.cz);
+  const limit = field.radius - margin;
+  const centroid = points.reduce((sum, p) => sum.add(p), new THREE.Vector2()).divideScalar(points.length);
+  const pull = center.clone().sub(centroid); // 1 만큼 옮기면 무게중심이 원 중심에 옴
+  const fits = (t) => points.every((p) => p.clone().addScaledVector(pull, t).distanceTo(center) <= limit);
+  // 다 들어가는 가장 적은 이동량을 이분 탐색. 원 중심에 둬도 안 들어가는 아주 좁은 화면이면 그냥 중심에
+  let lo = 0;
+  let hi = fits(0) ? 0 : 1;
+  if (hi && fits(hi)) {
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+  }
+  for (const p of points) p.addScaledVector(pull, hi);
+}
+
 function layout() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -368,18 +424,18 @@ function layout() {
     distance = clamp(distance * (MIN_FIELD / Math.max(shortSide, 0.1)), 8, 80);
   }
   placeCamera(distance);
-  field = measureField() ?? field;
+  const visible = measureField();
+  if (visible) field = circleIn(visible);
 
   physics.setBounds(field);
+  fitFloor();
   fitShadow();
   keepDiceInField();
-  placeLabels();
 }
 
 function fitShadow() {
-  const cx = (field.minX + field.maxX) / 2;
-  const cz = (field.minZ + field.maxZ) / 2;
-  const reach = Math.hypot(field.maxX - field.minX, field.maxZ - field.minZ) / 2 + 2;
+  const { cx, cz, radius } = field;
+  const reach = radius + 2;
   sun.target.position.set(cx, 0, cz);
   sun.position.set(cx - 6, 16, cz - 3);
   const cam = sun.shadow.camera;
@@ -398,8 +454,7 @@ function keepDiceInField() {
   }
   const margin = DIE_SIZE * 0.6;
   for (const { body } of dice) {
-    const x = clamp(body.position.x, field.minX + margin, field.maxX - margin);
-    const z = clamp(body.position.z, field.minZ + margin, field.maxZ - margin);
+    const [x, z] = insideField(body.position.x, body.position.z, margin);
     if (x === body.position.x && z === body.position.z) continue;
     placeBody(body, x, body.position.y, z, body.quaternion);
     body.wakeUp();
@@ -478,6 +533,7 @@ window.addEventListener('resize', layout);
 // ── 시작 ───────────────────────────────────────────────
 
 applySound();
+fitFloor();
 physics.setBounds(field); // 크기 0인 창에서 시작해 layout 이 건너뛰어져도 벽은 제자리에
 layout();
 setDiceCount(Number(store.get('dice.count', 2)) || 2);
@@ -492,6 +548,5 @@ renderer.setAnimationLoop((now) => {
     mesh.quaternion.copy(body.interpolatedQuaternion);
   }
   updateRoll(now);
-  placeLabels();
   renderer.render(scene, camera);
 });

@@ -28,13 +28,12 @@ export const PIPS = {
   6: [[A, A], [C, A], [A, B], [C, B], [A, C], [C, C]],
 };
 
-// 한국 주사위처럼 1은 크고 빨간 눈
+// 한국 주사위처럼 1은 큰 눈
 export const pipRadius = (value) => (value === 1 ? 0.14 : 0.08);
 
 export const COLORS = {
-  body: '#f3eee4',
-  pip: '#1c1c21',
-  pipOne: '#cf2e38',
+  body: '#161616',
+  pip: '#f5f5f5',
 };
 
 const COLOR_RES = 512;
@@ -53,7 +52,7 @@ function faceColorTexture(value, anisotropy) {
     const y = v * COLOR_RES;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = value === 1 ? COLORS.pipOne : COLORS.pip;
+    ctx.fillStyle = COLORS.pip;
     ctx.fill();
     // 가장자리를 살짝 어둡게 — 파인 홈처럼 보이게
     const rim = ctx.createRadialGradient(x, y, r * 0.55, x, y, r);
@@ -124,11 +123,13 @@ function sharedAssets({ envMap, anisotropy }) {
       map: faceColorTexture(value, anisotropy),
       normalMap,
       clearcoatNormalMap: normalMap,
-      roughness: 0.38,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.14,
+      roughness: 0.42,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.2,
       envMap,
-      envMapIntensity: 0.9,
+      envMapIntensity: 0.6,
+      // 그림자는 빛을 받는 면으로 계산. 기본값(뒷면)이면 바닥에 닿는 밑동으로 빛이 새서 흰 줄이 생김
+      shadowSide: THREE.FrontSide,
     });
   });
   shared = { geometry, materials };

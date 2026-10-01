@@ -3,6 +3,7 @@ import { DIE_SIZE } from './dice.js';
 
 const GRAVITY = 50; // 주사위 한 변 = 1 기준. 실제 비율보다 약하게 해서 구르는 게 잘 보이게
 const CEILING = 9; // 너무 높이 튀어 화면 밖으로 나가지 않게 막는 천장
+const WALL_SEGMENTS = 48; // 둥근 벽을 이만큼의 평면으로 둘러쌈. 볼록한 모양이라 무한 평면을 겹쳐도 안쪽은 막히지 않음
 
 export function createPhysics() {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0), allowSleep: true });
@@ -25,22 +26,20 @@ export function createPhysics() {
   };
   plane(table, -Math.PI / 2, 0);
   plane(wall, Math.PI / 2, 0).position.y = CEILING;
-  const walls = {
-    left: plane(wall, 0, Math.PI / 2),
-    right: plane(wall, 0, -Math.PI / 2),
-    far: plane(wall, 0, 0),
-    near: plane(wall, 0, Math.PI),
-  };
+  const walls = Array.from({ length: WALL_SEGMENTS }, () => plane(wall, 0, 0));
 
   return {
     world,
 
-    /** 화면에 보이는 범위(x, z)에 맞춰 보이지 않는 벽 옮기기 */
-    setBounds({ minX, maxX, minZ, maxZ }) {
-      walls.left.position.x = minX;
-      walls.right.position.x = maxX;
-      walls.far.position.z = minZ;
-      walls.near.position.z = maxZ;
+    /** 바닥 원 둘레에 보이지 않는 벽 세우기. 각 평면은 원에 접하고 법선은 중심을 향함 */
+    setBounds({ cx, cz, radius }) {
+      walls.forEach((body, i) => {
+        const angle = (i / WALL_SEGMENTS) * Math.PI * 2;
+        const nx = -Math.cos(angle);
+        const nz = -Math.sin(angle);
+        body.position.set(cx - nx * radius, 0, cz - nz * radius);
+        body.quaternion.setFromEuler(0, Math.atan2(nx, nz), 0);
+      });
     },
 
     addDie() {
