@@ -342,48 +342,6 @@ button:focus-visible {
   transform: scale(0.97);
 }
 
-/* ── 주사위 위 숫자 말풍선 ─────────── */
-
-#labels {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.die-label {
-  position: absolute;
-  left: 0;
-  top: 0;
-  will-change: transform;
-}
-
-.die-label span {
-  display: block;
-  min-width: 28px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(11, 11, 11, 0.92);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  translate: -50% -100%;
-  transform-origin: 50% 100%;
-  scale: 0.6;
-  opacity: 0;
-  transition:
-    opacity 0.2s,
-    scale 0.35s cubic-bezier(0.2, 1.5, 0.4, 1);
-}
-
-.die-label.show span {
-  scale: 1;
-  opacity: 1;
-  transition-delay: calc(var(--i, 0) * 40ms);
-}
-
 /* 가로로 누운 폰처럼 세로가 낮은 화면 */
 @media (max-height: 540px) {
   .result-total {

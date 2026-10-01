@@ -123,11 +123,13 @@ function sharedAssets({ envMap, anisotropy }) {
       map: faceColorTexture(value, anisotropy),
       normalMap,
       clearcoatNormalMap: normalMap,
-      roughness: 0.38,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.14,
+      roughness: 0.42,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.2,
       envMap,
-      envMapIntensity: 0.9,
+      envMapIntensity: 0.6,
+      // 그림자는 빛을 받는 면으로 계산. 기본값(뒷면)이면 바닥에 닿는 밑동으로 빛이 새서 흰 줄이 생김
+      shadowSide: THREE.FrontSide,
     });
   });
   shared = { geometry, materials };
